@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { wallShape, wallMatrix, type WallDef } from '../../packages/room-runtime/walls';
 import type { BuiltRoom, RoomModule, RoomLayout, V3 } from '../../packages/room-runtime/types';
 
 /** Shape of data/demos/<id>/scan.json, written by bundle_to_room.py. */
 export interface ScanJson {
+  transform?: { worldToRoom: number[] };
   polygon: number[][];
   walls: { a: number[]; b: number[]; u: number[]; n: number[]; origin: number[]; length: number; height?: number;
     openings: { kind: string; u0: number; u1: number; v0: number; v1: number }[] }[];
@@ -92,8 +94,20 @@ export function scanRoom(id: string, label: string, scan: ScanJson): RoomModule 
         walkable: (x, z) => [[0, 0], [.2, 0], [-.2, 0], [0, .2], [0, -.2]].every(([dx, dz]) => inside(x + dx, z + dz)),
         camera: { orbit: [cx + span, span * 1.1, cz + span], target: [cx, .8, cz], walk: [cx, 1.6, cz], walkLook: [cx + 1, 1.4, cz] },
         environment: { center: [cx, 1.2, cz], intensity: 1 },
-        async loadReference() { return new THREE.Group(); },
-        referenceAvailable: false, referenceKind: 'layout',
+        // The LiDAR mesh copied to data/web-assets/<id>/mesh.ply by tools/ingest-scan.sh, moved into room coordinates.
+        async loadReference(onProgress) {
+          const geo = await new PLYLoader().loadAsync(`/${id}/mesh.ply`, e => e.total && onProgress?.(e.loaded / e.total));
+          // Cached true-color per vertex (RGB bytes); the PLY's own colors are the photo-coverage heat map.
+          const bin = await fetch(`/${id}/colors.bin`).then(r => r.ok ? r.arrayBuffer() : undefined).catch(() => undefined);
+          if (bin && bin.byteLength === geo.getAttribute('position').count * 3) {
+            geo.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(bin), 3, true));
+          } else if (geo.hasAttribute('color')) geo.getAttribute('color').normalized = true;
+          geo.computeVertexNormals();
+          const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: geo.hasAttribute('color'), side: THREE.DoubleSide }));
+          if (scan.transform) mesh.applyMatrix4(new THREE.Matrix4().fromArray(scan.transform.worldToRoom));
+          const g = new THREE.Group(); g.add(mesh); return g;
+        },
+        referenceAvailable: true, referenceKind: 'scan',
       };
     },
   };

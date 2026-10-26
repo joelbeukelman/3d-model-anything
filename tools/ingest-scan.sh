@@ -16,4 +16,7 @@ if [[ -z $ROOM && ! -f $BUNDLE/structure.json ]]; then
 fi
 python3 "$ROOT/.agents/skills/scan-to-threejs/scripts/bundle_to_room.py" "$BUNDLE" \
   ${ROOM:+--room "$ROOM"} -o "$OUT/scan.json" --plan "$OUT/plan.png"
+# LiDAR mesh for the viewer's Scan/Overlay modes (served from the site root as /<id>/mesh.ply)
+PLY=$(ls "$BUNDLE"/mesh/room-*.ply 2>/dev/null | head -1 || true)
+if [[ -n ${PLY:-} ]]; then mkdir -p "$ROOT/data/web-assets/$ID"; cp "$PLY" "$ROOT/data/web-assets/$ID/mesh.ply"; cp "${PLY%.ply}-colors.bin" "$ROOT/data/web-assets/$ID/colors.bin" 2>/dev/null || true; fi
 echo "OK → http://localhost:5188/?room=$ID   Play: http://localhost:5188/play.html?room=$ID&mode=fpv"

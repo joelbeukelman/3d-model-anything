@@ -17,3 +17,6 @@ apps/house-capture/release/screenshots/
 HouseCapture.xcodeproj/
 data/demos/*/
 !data/demos/office-*/
+data/web-assets/*/mesh.ply
+!data/web-assets/office-v4/
+data/web-assets/*/colors.bin
