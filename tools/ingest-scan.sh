@@ -9,6 +9,11 @@ mkdir -p "$DEST" "$OUT"
 if [[ -f $SRC ]]; then unzip -oq "$SRC" -d "$DEST"; else cp -R "$SRC"/. "$DEST"/; fi
 MAN=$(find "$DEST" -name manifest.json -not -path '*/__MACOSX/*' | head -1)
 [[ -n $MAN ]] || { echo "no manifest.json found in export" >&2; exit 1; }
-python3 "$ROOT/.agents/skills/scan-to-threejs/scripts/bundle_to_room.py" "$(dirname "$MAN")" \
+BUNDLE=$(dirname "$MAN")
+# single-room exports have no structure.json: use that room's own file
+if [[ -z $ROOM && ! -f $BUNDLE/structure.json ]]; then
+  ROOM=$(ls "$BUNDLE"/rooms/room-*.json | head -1 | sed -E 's/.*room-([0-9]+)\.json/\1/')
+fi
+python3 "$ROOT/.agents/skills/scan-to-threejs/scripts/bundle_to_room.py" "$BUNDLE" \
   ${ROOM:+--room "$ROOM"} -o "$OUT/scan.json" --plan "$OUT/plan.png"
 echo "OK → http://localhost:5188/?room=$ID   Play: http://localhost:5188/play.html?room=$ID&mode=fpv"
