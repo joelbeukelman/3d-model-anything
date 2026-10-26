@@ -20,3 +20,5 @@ data/demos/*/
 data/web-assets/*/mesh.ply
 !data/web-assets/office-v4/
 data/web-assets/*/colors.bin
+.venv/
+data/web-assets/*/photos/
