@@ -22,3 +22,4 @@ data/web-assets/*/mesh.ply
 data/web-assets/*/colors.bin
 .venv/
 data/web-assets/*/photos/
+data/web-assets/*/scan.glb

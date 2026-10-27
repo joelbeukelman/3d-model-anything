@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { wallShape, wallMatrix, type WallDef } from '../../packages/room-runtime/walls';
 import type { BuiltRoom, RoomModule, RoomLayout, V3 } from '../../packages/room-runtime/types';
@@ -96,6 +97,15 @@ export function scanRoom(id: string, label: string, scan: ScanJson): RoomModule 
         environment: { center: [cx, 1.2, cz], intensity: 1 },
         // The LiDAR mesh copied to data/web-assets/<id>/mesh.ply by tools/ingest-scan.sh, moved into room coordinates.
         async loadReference(onProgress) {
+          // Preferred: photo-colored mesh from reconstruct_bundle.py (already in room coordinates).
+          if (await fetch(`/${id}/scan.glb`, { method: 'HEAD' }).then(r => r.ok && !(r.headers.get('content-type') ?? '').includes('html')).catch(() => false)) {
+            const gltf = await new GLTFLoader().loadAsync(`/${id}/scan.glb`, e => e.total && onProgress?.(e.loaded / e.total));
+            gltf.scene.traverse(o => {
+              if (!(o instanceof THREE.Mesh)) return;
+              o.material = new THREE.MeshBasicMaterial({ vertexColors: o.geometry.hasAttribute('color'), side: THREE.DoubleSide });
+            });
+            return gltf.scene;
+          }
           const geo = await new PLYLoader().loadAsync(`/${id}/mesh.ply`, e => e.total && onProgress?.(e.loaded / e.total));
           // Cached true-color per vertex (RGB bytes); the PLY's own colors are the photo-coverage heat map.
           const bin = await fetch(`/${id}/colors.bin`).then(r => r.ok ? r.arrayBuffer() : undefined).catch(() => undefined);

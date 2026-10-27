@@ -19,4 +19,9 @@ python3 "$ROOT/.agents/skills/scan-to-threejs/scripts/bundle_to_room.py" "$BUNDL
 # LiDAR mesh for the viewer's Scan/Overlay modes (served from the site root as /<id>/mesh.ply)
 PLY=$(ls "$BUNDLE"/mesh/room-*.ply 2>/dev/null | head -1 || true)
 if [[ -n ${PLY:-} ]]; then mkdir -p "$ROOT/data/web-assets/$ID"; cp "$PLY" "$ROOT/data/web-assets/$ID/mesh.ply"; cp "${PLY%.ply}-colors.bin" "$ROOT/data/web-assets/$ID/colors.bin" 2>/dev/null || true; fi
+# Optional photo-colored mesh (2-4 min per room; needs .venv with open3d + numpy<2 + pillow): DETAIL=1 tools/ingest-scan.sh ...
+if [[ ${DETAIL:-} == 1 ]]; then
+  "$ROOT/.venv/bin/python" -u "$ROOT/.agents/skills/scan-to-threejs/scripts/reconstruct_bundle.py" "$BUNDLE" --room "$OUT/scan.json" --voxel 0.02 -o "$ROOT/data/captures/$ID-recon"
+  cp "$ROOT/data/captures/$ID-recon/scan_room.glb" "$ROOT/data/web-assets/$ID/scan.glb"
+fi
 echo "OK → http://localhost:5188/?room=$ID   Play: http://localhost:5188/play.html?room=$ID&mode=fpv"
