@@ -22,6 +22,11 @@ Follows Wes's tutorial (https://www.youtube.com/watch?v=DdkrydixUQw) and the rep
 (~3 min/room, 25-30 MB output, git-ignored). The viewer's **Scan** and **Overlay** modes use it automatically.
 One-time setup: `.venv/bin/pip install "numpy<2" open3d pillow` (numpy 2 segfaults Open3D 0.18).
 
+## Real object shapes (cut from the photo mesh)
+After `DETAIL=1` ingest: write `tools/extract-config/<room-id>.json` (see `studio.json`; surfaces = desk/bench/shelf tops, floorItems = floor region),
+then `.venv/bin/python tools/extract-objects.py <room-id>`. Furniture is cropped by its RoomPlan box; clutter on surfaces is split by a height-map watershed,
+filled into solids and colored from the photos. `demos/<id>/room.ts` swaps its stand-in boxes for these via `loadProps('<id>')`. Needs `scipy scikit-image trimesh`.
+
 ## Upgrade the baseline to a real model (the tutorial's agent step)
 7. [ ] `pip install pillow` in a venv (needed for photos); install `agent-browser` CLI for the capture scripts.
 8. [ ] Ask your coding agent: *"Use scan-to-threejs to rebuild the room in data/captures-in/<room-id>. Inspect measurements and photos, create an editable scene, compare rendered views with the original photographs."*

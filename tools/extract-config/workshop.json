@@ -1,0 +1,10 @@
+{
+  "solid": true,
+  "furniture": [],
+  "surfaces": [
+    { "name": "counter-item", "rect": [-2.7, 3.92, -0.896, -0.23], "top": 1.02, "height": 0.5, "faces": 2500, "minPts": 40, "window": 0.1 }
+  ],
+  "floorItems": [
+    { "name": "floor-item", "rect": [-4.7, 4.7, -0.18, 0.88], "height": 0.8, "faces": 3500, "window": 0.18 }
+  ]
+}

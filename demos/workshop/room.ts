@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadProps } from '../scan-room/props';
 import { scanRoom, type ScanJson } from '../scan-room';
 import { box, cylinder, place, sphere, type V3 } from '../../packages/room-runtime/helpers';
 import type { BuiltRoom, PhotoPose } from '../../packages/room-runtime/types';
@@ -133,6 +134,14 @@ export default async function build(scan: ScanJson & { photos?: { position: numb
   for (let i = 0; i < 4; i++) { const l = box([.05, 2.0, .09], [3.55 + i * .06, 1.0, -.3], M.raw); l.rotation.z = .08; group.add(named(l, 'lumber-leaning', dyn(3, 'wood'))); }
   const roll = cylinder(.2, 1.4, [-3.65, .7, -.55], std('#7a8a6a', .95), 16); group.add(named(roll, 'rolled-carpet', dyn(15, 'soft')));
   for (let i = 0; i < 10; i++) group.add(named(box([.22 + rnd() * .2, .12 + rnd() * .2, .2 + rnd() * .2], [-.6 + rnd() * 4.4, .1 + rnd() * .1, -.2 + rnd() * .5], pick([M.card, M.dark, std('#f1f0ea', .6)])), 'floor-box', dyn(2, 'cardboard')));
+
+  // --- real objects cut from the photo reconstruction replace the stand-in clutter ---
+  const props = await loadProps('workshop');
+  if (props.length) {
+    const standIns = /^(parts-bin|cardboard-box|power-tool|chainsaw|bucket|propane-tank|paint-can|gas-can|compressor|lumber-leaning|rolled-carpet|floor-box)$/;
+    for (const o of [...group.children]) if (standIns.test(o.name)) group.remove(o);
+    group.add(...props);
+  }
 
   // --- lighting: warm shop lights along the ceiling ---
   room.lights.clear();

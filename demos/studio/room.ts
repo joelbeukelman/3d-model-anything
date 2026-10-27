@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadProps } from '../scan-room/props';
 import { scanRoom, type ScanJson } from '../scan-room';
 import { box, cylinder, cushion, place, type V3 } from '../../packages/room-runtime/helpers';
 import type { BuiltRoom, PhotoPose } from '../../packages/room-runtime/types';
@@ -157,7 +158,7 @@ export default async function build(scan: ScanJson & { photos?: { position: numb
   group.add(named(at(throwPillow(-.4, 1.62, -.1), -.4, 1.66, -.1, .66), 'pillow-2', { type: 'dynamic', shape: 'box', mass: .6, surface: 'soft' }));
 
   // --- L-shaped standing desk on the -x and north walls ---
-  const desk = new THREE.Group(); const topY = .9;
+  const desk = new THREE.Group(); const topY = .94;
   desk.add(box([.611, .04, 2.249], [-1.352, topY - .02, -.806], M.oak), box([.989, .04, .646], [-.569, topY - .02, -1.608], M.oak));
   standingDeskLeg(-1.352, -1.82, desk, topY, true); standingDeskLeg(-1.352, .2, desk, topY, true); standingDeskLeg(-.15, -1.62, desk, topY, false);
   desk.add(box([.5, .006, .3], [-1.3, topY + .003, -.3], std('#202225', .9)));
@@ -178,17 +179,17 @@ export default async function build(scan: ScanJson & { photos?: { position: numb
 
   // --- east wall: floating shelves over a butcher-block bench with clear bins ---
   const shelves = new THREE.Group();
-  for (const y of [1.3, 1.72]) {
+  for (const y of [1.295, 1.645]) {
     shelves.add(box([.3, .035, 2.95], [X - .15, y, -.03], M.steel));
     for (const z of [-1.3, -.03, 1.25]) shelves.add(box([.04, .1, .04], [X - .03, y - .07, z], M.steel));
   }
   group.add(named(shelves, 'wall-shelves', stat));
-  const books = new THREE.Group(); bookRun(books, -1.4, -.2, 1.318, X - .15, 'z'); bookRun(books, .35, 1.1, 1.318, X - .15, 'z');
-  bookRun(books, -1.35, -.9, 1.738, X - .15, 'z'); group.add(books);
+  const books = new THREE.Group(); bookRun(books, -1.4, -.2, 1.313, X - .15, 'z'); bookRun(books, .35, 1.1, 1.313, X - .15, 'z');
+  bookRun(books, -1.35, -.9, 1.663, X - .15, 'z'); group.add(books);
   group.add(named(box([.22, .12, .3], [X - .16, 1.8, .5], std('#2a2a2c', .4, .3)), 'camera', { type: 'dynamic', shape: 'box', mass: .8 }),
     named(box([.26, .11, .1], [X - .15, 1.375, -.75], std('#e8523a', .6)), 'sneaker-red', { type: 'dynamic', shape: 'box', mass: .4 }),
     named(box([.26, .11, .1], [X - .15, 1.775, .9], std('#f5f5f2', .6)), 'sneaker-white', { type: 'dynamic', shape: 'box', mass: .4 }));
-  const bench = new THREE.Group(); const bt = .78;
+  const bench = new THREE.Group(); const bt = .73;
   bench.add(box([.756, .04, 2.39], [1.28, bt - .02, -.558], M.oak));
   for (const z of [-1.7, .55]) bench.add(box([.05, bt - .04, .05], [1.55, (bt - .04) / 2, z], M.steel), box([.6, .04, .05], [1.3, .02, z], M.steel));
   group.add(named(bench, 'bench', stat));
@@ -243,6 +244,14 @@ export default async function build(scan: ScanJson & { photos?: { position: numb
   for (const s of [-1, 1]) { const tine = box([.04, .3, .02], [s * .14, .18, 0], M.white); tine.rotation.z = -s * .5; group.add(named(place(tine, [-1.0 + s * .1, 1.92, Z - .04]), 'antler', { type: 'none' })); }
   for (const [x, y, w, h, cols, busy] of [[.1, 1.95, .3, .38, ['#222', '#e8d3c0', '#b5382c'], true], [1.4, 1.35, .45, .6, ['#e0b34a', '#222', '#c0392b'], false], [-1.4, 1.0, .5, .5, ['#1c1c1e', '#e8e8e8', '#b5382c'], false]] as const) {
     const f = frame(w, h, poster([...cols], busy)); f.rotation.y = Math.PI; f.position.set(x, y, Z - .02); group.add(named(f, 'wall-art', { type: 'none' }));
+  }
+
+  // --- real objects cut from the photo reconstruction replace the stand-ins ---
+  const props = await loadProps('studio');
+  if (props.length) {
+    const standIns = /^(sofa|pillow(-2)?|office-chair|keyboard|mouse|speaker|mug|book-\d+|camera|sneaker-(red|white)|printer|cutting-mat|paper-stack|flag-\d|pennant-\d)$/;
+    for (const o of [...group.children]) { if (standIns.test(o.name)) group.remove(o); else if (o.children.length) for (const c of [...o.children]) if (standIns.test(c.name)) o.remove(c); }
+    group.add(...props);
   }
 
   // --- reference + photos ---

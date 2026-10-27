@@ -23,3 +23,5 @@ data/web-assets/*/colors.bin
 .venv/
 data/web-assets/*/photos/
 data/web-assets/*/scan.glb
+data/web-assets/*/props.glb
+data/web-assets/*/props.json
