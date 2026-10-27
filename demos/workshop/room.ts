@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { loadProps } from '../scan-room/props';
+import * as O from '../scan-room/objects';
 import { scanRoom, type ScanJson } from '../scan-room';
 import { box, cylinder, place, sphere, type V3 } from '../../packages/room-runtime/helpers';
 import type { BuiltRoom, PhotoPose } from '../../packages/room-runtime/types';
@@ -85,12 +86,13 @@ export default async function build(scan: ScanJson & { photos?: { position: numb
   const units = Math.round((CX1 - CX0) / .6), uw = (CX1 - CX0) / units;
   for (let i = 0; i < units; i++) {
     const cx = CX0 + (i + .5) * uw;
-    cab.add(box([uw - .02, .15, .025], [cx, CH - .11, FRONT - .005], M.oak), box([uw - .02, CH - .36, .025], [cx, .2 + (CH - .36) / 2 + .0, FRONT - .005], M.oak));
-    for (const y of [CH - .11, .5]) cab.add(sphere(.022, [cx + (y > .6 ? 0 : uw / 2 - .08), y, FRONT + .025], M.knob));
+    const drawer = O.oakDoor(uw - .02, .15, M.oak, M.knob, 'c'); drawer.position.set(cx, CH - .11, FRONT + .004);
+    const door = O.oakDoor(uw - .02, CH - .36, M.oak, M.knob, i % 2 ? 'tl' : 'tr'); door.position.set(cx, .2 + (CH - .36) / 2, FRONT + .004);
+    cab.add(drawer, door);
   }
   cab.add(box([CX1 - CX0 + .06, .045, CAB_D + .05], [(CX0 + CX1) / 2, CH + .0225, WALL + CAB_D / 2 + .02], M.ply));
   group.add(named(cab, 'base-cabinets', stat));
-  group.add(named(box([.51, .02, .5], [1.912, CH + .055, WALL + .33], std('#555a5e', .25, .9)), 'sink', stat));
+  const sink = O.sinkWithFaucet(); sink.position.set(1.912, CH + .045, WALL + .33); group.add(named(sink, 'sink', stat));
 
   // tall oak cabinet at the east end
   const tall = new THREE.Group(); tall.add(box([.799, 2.1, .69], [4.315, 1.05, -.551], M.oak), box([.36, 1.8, .02], [4.12, 1.0, -.2], std('#7a5128', .6)), box([.36, 1.8, .02], [4.51, 1.0, -.2], std('#7a5128', .6)));
@@ -105,14 +107,9 @@ export default async function build(scan: ScanJson & { photos?: { position: numb
   // --- pegboard tools (hanging, decorative) ---
   for (let i = 0; i < 150; i++) {
     const w = .03 + rnd() * .12, h = .06 + rnd() * .22, x = X0 + .9 + rnd() * (X1 - X0 - 1.6);
-    if (x > 3.8 && x < 4.75) continue;
+    if ((x > 3.8 && x < 4.75) || (x > -3.45 && x < 3.85)) continue;  // hand-modeled tools cover the middle of the wall
     group.add(named(box([w, h, .05 + rnd() * .05], [x, 1.2 + rnd() * .95, WALL + .05], std(pick(TOOL), .55)), 'pegboard-tool', none));
   }
-  for (let i = 0; i < 16; i++) {
-    const reel = cylinder(.09, .04, [X0 + 1.2 + i * .5 + rnd() * .2, 1.7 + rnd() * .4, WALL + .08], std(pick(['#2a2b2e', '#e8631a', '#c0392b']), .6), 18);
-    reel.rotation.x = Math.PI / 2; group.add(named(reel, 'hanging-reel', none));
-  }
-
   // --- counter clutter (throwable) ---
   for (let i = 0; i < 38; i++) {
     const c = CX0 + .2 + rnd() * (CX1 - CX0 - .4); if (Math.abs(c - 1.912) < .3) continue;
@@ -135,13 +132,48 @@ export default async function build(scan: ScanJson & { photos?: { position: numb
   const roll = cylinder(.2, 1.4, [-3.65, .7, -.55], std('#7a8a6a', .95), 16); group.add(named(roll, 'rolled-carpet', dyn(15, 'soft')));
   for (let i = 0; i < 10; i++) group.add(named(box([.22 + rnd() * .2, .12 + rnd() * .2, .2 + rnd() * .2], [-.6 + rnd() * 4.4, .1 + rnd() * .1, -.2 + rnd() * .5], pick([M.card, M.dark, std('#f1f0ea', .6)])), 'floor-box', dyn(2, 'cardboard')));
 
-  // --- real objects cut from the photo reconstruction replace the stand-in clutter ---
-  const props = await loadProps('workshop');
+  // --- real objects cut from the photo reconstruction, minus whatever is modeled by hand below ---
+  const handFloor: [number, number][] = [[-4.45, -.55], [-4.4, .1], [-4.25, .25], [-3.05, -.3], [-2.7, -.35], [-2.95, -.05], [-2.1, -.35], [-1.4, -.38], [-1.1, -.3], [-1.4, .0], [.4, -.35]];
+  const props = await loadProps('workshop', p => (p.pivot[1] > 1.15 && p.pivot[2] < -.5) ||
+    (p.pivot[1] < .4 && handFloor.some(([x, z]) => Math.hypot(p.pivot[0] - x, p.pivot[2] - z) < .3)) || (Math.hypot(p.pivot[0] - 3.3, p.pivot[2] + .55) < .5 && p.pivot[1] > .9));
+  const standIns = /^(parts-bin|cardboard-box|power-tool|chainsaw|bucket|propane-tank|paint-can|gas-can|compressor|lumber-leaning|rolled-carpet|floor-box)$/;
   if (props.length) {
-    const standIns = /^(parts-bin|cardboard-box|power-tool|chainsaw|bucket|propane-tank|paint-can|gas-can|compressor|lumber-leaning|rolled-carpet|floor-box)$/;
-    for (const o of [...group.children]) if (standIns.test(o.name)) group.remove(o);
+    for (const o of [...group.children]) if (standIns.test(o.name) && !/^(lumber-leaning|rolled-carpet|floor-box|parts-bin|cardboard-box|power-tool)$/.test(o.name)) group.remove(o);
+    for (const o of [...group.children]) if (/^(parts-bin|cardboard-box|power-tool|lumber-leaning|rolled-carpet|floor-box)$/.test(o.name)) group.remove(o);
     group.add(...props);
   }
+  const place3 = (o: THREE.Object3D, x: number, y: number, z: number, ry = 0, physics?: object) => { o.position.set(x, y, z); o.rotation.y = ry; if (physics) o.userData.physics = physics; group.add(o); return o; };
+  for (const o of [...group.children]) if (/^(bucket|propane-tank|paint-can|gas-can|compressor)$/.test(o.name)) group.remove(o);
+  place3(O.compressor(), -4.45, 0, -.55, Math.PI / 2, { type: 'dynamic', shape: 'box', mass: 35, surface: 'metal' });
+  place3(O.hoseReel(), X0 + .01, 1.45, -.3, Math.PI / 2, { type: 'static' });
+  place3(O.gasCan(), -4.4, 0, .1, .4, dyn(2, 'plastic')); place3(O.gasCan(), -4.25, 0, .25, -.3, dyn(2, 'plastic'));
+  place3(O.bucket('#2f5fb0'), -3.05, 0, -.3, 0, dyn(2.5, 'plastic')); place3(O.bucket('#f1f0ea'), -2.7, 0, -.35, 0, dyn(2.5, 'plastic')); place3(O.bucket('#2f5fb0', true), -2.95, 0, -.05, 0, dyn(2.5, 'plastic'));
+  place3(O.propaneTank(), -2.1, 0, -.35, 0, dyn(8, 'metal'));
+  for (const [x, y, z, c] of [[-1.4, 0, -.38, '#b53a2a'], [-1.1, 0, -.3, '#2d5f7a'], [-1.4, .2, -.38, '#b53a2a'], [.4, 0, -.35, '#e8e8e8']] as const) place3(O.paintCan(c), x, y, z, rnd() * 6, dyn(1.2, 'metal'));
+  place3(O.huskvarnaChainsaw(), 3.3, CH + .045, -.55, .2, dyn(6, 'plastic'));
+
+  // --- hand-modeled pegboard tools, in the order they hang on the wall (door end → east end) ---
+  const hung: [number, number][] = [];
+  const PZ = WALL + .03, hang = (o: THREE.Object3D, x: number, y: number, ry = 0) => { hung.push([x, y]); o.position.set(x, y, PZ); o.rotation.z = ry; o.userData.physics = { type: 'dynamic', shape: 'box', mass: 1.2, wakeOnSupportLoss: false, wakeOnImpact: true }; group.add(o); return o; };
+  hang(O.earDefenders(), -3.3, 1.78); hang(O.blackBag(), -3.4, 1.5);
+  for (let i = 0; i < 5; i++) hang(O.ryobiBattery(), -3.15 + i * .11, 1.62);
+  for (let i = 0; i < 4; i++) hang(O.ryobiBattery(), -3.1 + i * .11, 1.46);
+  hang(O.ryobiCharger(), -2.5, 1.58); hang(O.ryobiCharger(), -2.5, 1.38);
+  hang(O.socketRail(), -1.9, 1.92); hang(O.ryobiDrill(), -2.0, 1.5); hang(O.ryobiCircularSaw(), -1.75, 1.25);
+  hang(O.wrenchRack(9), -1.45, 1.55); hang(O.pliers(), -1.1, 1.4); hang(O.hoseCoil(), -1.65, 1.05);
+  hang(O.hardHat('#f26a1b', true), -.75, 1.92); hang(O.tapeRolls(), -.5, 1.4, 0); hang(O.ropeSpool(), -.28, 1.28);
+  hang(O.ryobiReciprocatingSaw(), .25, 1.6); hang(O.ryobiJigsaw(), .55, 1.42); hang(O.ryobiDrill(), .85, 1.58); hang(O.ryobiCharger(), .95, 1.3);
+  hang(O.chainsawBar(.5), 1.05, 1.62, Math.PI / 2); hang(O.tinSnips(), .35, 1.28); hang(O.screwdrivers(6), .55, 1.18);
+  hang(O.ryobiNailer(), 1.45, 1.6); hang(O.ryobiNailer(), 1.5, 1.34); hang(O.ryobiBeltSander(), 1.9, 1.58); hang(O.ryobiCircularSaw(), 1.9, 1.3);
+  hang(O.hoseCoil('#161718', .12), 2.3, 1.5); hang(O.hedgeTrimmer(.55), 2.55, 1.22); hang(O.tinSnips(), 2.15, 1.82);
+  hang(O.hardHat('#f2c40f'), 3.15, 1.95); hang(O.cowboyHat(), 2.95, 1.62); hang(O.hoseCoil('#e9e5d8', .1), 3.45, 1.5);
+  // fill the gaps the way the real wall is filled: lots of small tools between the big ones
+  const filler = [() => O.ryobiBattery(), () => O.pliers(), () => O.tinSnips(), () => O.screwdrivers(5), () => O.tapeRolls(), () => O.ryobiCharger(), () => O.ryobiDrill(), () => O.ryobiJigsaw(), () => O.earDefenders(), () => O.wrenchRack(6), () => O.ryobiBattery()];
+  for (let x = -3.35; x < 3.8; x += .2) for (const y of [1.2, 1.42, 1.64, 1.86, 2.05]) {
+    if (hung.some(([hx, hy]) => Math.abs(hx - x) < .19 && Math.abs(hy - y) < .17) || rnd() < .45) continue;
+    hang(pick(filler)(), x + (rnd() - .5) * .05, y);
+  }
+  hang(O.sandpaperPack(), 3.05, 1.28); hang(O.sandpaperPack(), 3.25, 1.28); hang(O.ryobiDrill(), 3.55, 1.7); hang(O.hedgeTrimmer(.45), 3.55, 1.15);
 
   // --- lighting: warm shop lights along the ceiling ---
   room.lights.clear();

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { loadProps } from '../scan-room/props';
+import { tuftedSofa, draftingChair, monitorOnArm, dogCrate, wallAC } from '../scan-room/objects';
 import { scanRoom, type ScanJson } from '../scan-room';
 import { box, cylinder, cushion, place, type V3 } from '../../packages/room-runtime/helpers';
 import type { BuiltRoom, PhotoPose } from '../../packages/room-runtime/types';
@@ -246,13 +247,21 @@ export default async function build(scan: ScanJson & { photos?: { position: numb
     const f = frame(w, h, poster([...cols], busy)); f.rotation.y = Math.PI; f.position.set(x, y, Z - .02); group.add(named(f, 'wall-art', { type: 'none' }));
   }
 
-  // --- real objects cut from the photo reconstruction replace the stand-ins ---
-  const props = await loadProps('studio');
-  if (props.length) {
-    const standIns = /^(sofa|pillow(-2)?|office-chair|keyboard|mouse|speaker|mug|book-\d+|camera|sneaker-(red|white)|printer|cutting-mat|paper-stack|flag-\d|pennant-\d)$/;
-    for (const o of [...group.children]) { if (standIns.test(o.name)) group.remove(o); else if (o.children.length) for (const c of [...o.children]) if (standIns.test(c.name)) o.remove(c); }
-    group.add(...props);
-  }
+  // --- real objects cut from the photo reconstruction, minus the ones modeled by hand below ---
+  const handModeled: [number, number, number][] = [[.166, 1.505, 1.1], [-1.0, -.806, .5], [-1.56, -.756, .45], [1.38, 1.0, .5]];
+  const props = await loadProps('studio', p => /^(sofa|chair)-/.test(p.name) || handModeled.some(([x, z, r]) => Math.hypot(p.pivot[0] - x, p.pivot[2] - z) < r && p.pivot[1] > .6 && p.name !== 'shelf-item'));
+  const standIns = /^(sofa|pillow(-2)?|office-chair|tv-panel|wall-ac|dog-crate|keyboard|mouse|speaker|mug|book-\d+|camera|sneaker-(red|white)|printer|cutting-mat|paper-stack|flag-\d|pennant-\d)$/;
+  if (props.length) for (const o of [...group.children]) { if (standIns.test(o.name)) group.remove(o); else if (o.children.length) for (const c of [...o.children]) if (standIns.test(c.name)) o.remove(c); }
+  group.add(...props);
+  // hand-modeled: sofa + loose pillows, drafting chair, monitor on its arm, dog crate, wall AC
+  const handSofa = tuftedSofa(); handSofa.position.set(.166, 0, 1.505); handSofa.rotation.y = Math.PI; handSofa.userData.physics = { type: 'static' };
+  group.add(handSofa); handSofa.updateMatrixWorld(true);
+  for (const n of ['pillow-white', 'pillow-striped']) { const pl = handSofa.getObjectByName(n)!; group.attach(pl); pl.userData.physics = { type: 'dynamic', shape: 'box', mass: .6, surface: 'soft' }; }
+  const chair = draftingChair(); chair.position.set(-1.0, 0, -.806); chair.rotation.y = -Math.PI / 2; chair.userData.physics = { type: 'dynamic', shape: 'box', mass: 9, boxInset: [.05, 0, .05] };
+  const monitor = monitorOnArm(); monitor.position.set(-1.57, .94, -.756); monitor.rotation.y = Math.PI / 2; monitor.userData.physics = { type: 'static' };
+  const handCrate = dogCrate(.75, .73, .55); handCrate.position.set(1.38, 0, 1.0); handCrate.rotation.y = -Math.PI / 2; handCrate.userData.physics = { type: 'dynamic', shape: 'box', mass: 14 };
+  const ac = wallAC(); ac.position.set(X, 1.95, -1.4); ac.rotation.y = -Math.PI / 2; ac.userData.physics = { type: 'static' };
+  group.add(chair, monitor, handCrate, ac);
 
   // --- reference + photos ---
   room.photos = (scan.photos ?? []).map((p, i): PhotoPose => ({ url: `/studio/photos/${String(i).padStart(4, '0')}.jpg`, position: p.position, forward: p.forward, up: p.up, fovY: p.fovY, aspect: p.aspect }));
